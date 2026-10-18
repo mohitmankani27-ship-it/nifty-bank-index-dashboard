@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="Equal-Weighted Sector Analytics", layout="wide", page_icon="📈")
 
 st.title("🏛️ Quantitative Sector & Equal-Weight Dashboard")
-st.caption("27 Sector Indices | Momentum & Trend Quality Leaderboard | Nifty 500 Benchmarking")
+st.caption("27 Sector Indices | High-Speed Momentum Leaderboard | Nifty 500 Benchmarking")
 
 # --- 1. MASTER SECTOR DIRECTORY ---
 DEFAULT_SECTORS = {
@@ -15,180 +15,117 @@ DEFAULT_SECTORS = {
         "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS",
         "PNB.NS", "UNIONBANK.NS", "BANKBARODA.NS", "CANBK.NS", "FEDERALBNK.NS",
         "AUBANK.NS", "IDFCFIRSTB.NS", "YESBANK.NS", "INDUSINDBK.NS", "BANDHANBNK.NS",
-        "RBLBANK.NS", "CUB.NS", "KARURVYSYA.NS", "SOUTHBANK.NS", "J&KBANK.NS",
-        "MAHABANK.NS", "CENTRALBK.NS", "PSB.NS", "IOB.NS", "UCOBANK.NS",
-        "CSBBANK.NS", "KTKBANK.NS", "EQUITASBNK.NS", "JSFB.NS", "UTKARSHBNK.NS",
-        "SURYODAY.NS", "ESAFSFB.NS", "UJJIVANSFB.NS"
+        "RBLBANK.NS", "CUB.NS", "KARURVYSYA.NS", "SOUTHBANK.NS", "J&KBANK.NS"
     ],
     "2. Information Technology": [
         "TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS",
         "LTM.NS", "PERSISTENT.NS", "COFORGE.NS", "MPHASIS.NS", "TATAELXSI.NS",
-        "LTTS.NS", "OFSS.NS", "CYIENT.NS", "BSOFT.NS", "KPITTECH.NS",
-        "ZENSARTECH.NS", "SONATSOFTW.NS", "MASTEK.NS", "FSL.NS", "SAKSOFT.NS",
-        "SASKEN.NS", "NEWGEN.NS", "RSYSTEMS.NS", "HAPPSTMNDS.NS", "E2E.NS",
-        "ECLERX.NS", "DATAMATICS.NS", "NUCLEUS.NS", "RAMCOSYS.NS", "INFOBEAN.NS"
+        "LTTS.NS", "OFSS.NS", "CYIENT.NS", "BSOFT.NS", "KPITTECH.NS"
     ],
     "3. Automobile (OEMs & EVs)": [
         "MARUTI.NS", "M&M.NS", "TATAMOTORS.NS", "BAJAJ-AUTO.NS", "HEROMOTOCO.NS",
         "TVSMOTOR.NS", "EICHERMOT.NS", "ASHOKLEY.NS", "HYUNDAI.NS", "FORCEMOT.NS",
-        "TMPV.NS", "TMCV.NS", "OLAELEC.NS", "ATHERENERG.NS", "ESCORTS.NS",
-        "SMLMAH.NS", "VSTTILLERS.NS"
+        "OLAELEC.NS", "ESCORTS.NS"
     ],
     "4. Auto Components & Ancillaries": [
         "MOTHERSON.NS", "BHARATFORG.NS", "BOSCHLTD.NS", "UNOMINDA.NS", "ENDURANCE.NS",
         "SONACOMS.NS", "MRF.NS", "BALKRISIND.NS", "CEATLTD.NS", "APOLLOTYRE.NS",
-        "JKTYRE.NS", "EXIDEIND.NS", "AMBER.NS", "SCHAEFFLER.NS", "SKFINDIA.NS",
-        "CRAFTSMAN.NS", "SANSERA.NS", "TIMKEN.NS", "GABRIEL.NS", "CIEINDIA.NS",
-        "LUMAXIND.NS", "LUMAXTECH.NS", "FIEMIND.NS", "ROLEXRINGS.NS", "GNA.NS",
-        "AUTOAXLES.NS", "RACLGEAR.NS", "TALBROAUTO.NS", "PRICOLLTD.NS", "SUBROS.NS",
-        "SURYAROSNI.NS", "BALUFORGE.NS", "SHARDAMOTR.NS", "HAPPYFORGE.NS", "MSUMI.NS"
+        "EXIDEIND.NS", "AMBER.NS", "SCHAEFFLER.NS", "SKFINDIA.NS", "CRAFTSMAN.NS"
     ],
     "5. Pharmaceuticals & Formulations": [
         "SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "LUPIN.NS", "TORNTPHARM.NS",
         "AUROPHARMA.NS", "ZYDUSLIFE.NS", "MANKIND.NS", "ALKEM.NS", "GLENMARK.NS",
-        "LAURUSLABS.NS", "IPCALAB.NS", "BIOCON.NS", "AJANTPHARM.NS", "GLAXO.NS",
-        "PFIZER.NS", "SANOFI.NS", "ABBOTINDIA.NS", "NATCOPHARM.NS", "ERIS.NS",
-        "JUBLPHARMA.NS", "STAR.NS", "MARKSANS.NS", "FDC.NS", "UNICHEMLAB.NS",
-        "CORONA.NS", "WOCKPHARMA.NS", "CAPLIPOINT.NS"
+        "LAURUSLABS.NS", "IPCALAB.NS", "BIOCON.NS", "AJANTPHARM.NS"
     ],
     "6. Healthcare, Hospitals & Diagnostics": [
         "APOLLOHOSP.NS", "MAXHEALTH.NS", "FORTIS.NS", "MEDANTA.NS", "NH.NS",
         "KIMS.NS", "ASTERDM.NS", "RAINBOW.NS", "LALPATHLAB.NS", "METROPOLIS.NS",
-        "VIJAYA.NS", "THYROCARE.NS", "ARTEMISMED.NS", "KOVAI.NS", "YATHARTH.NS",
-        "JLHL.NS", "KRSNAA.NS", "SURAKSHA.NS", "DRAGARWQ.NS"
+        "VIJAYA.NS", "THYROCARE.NS"
     ],
     "7. API, CDMO & Life Sciences": [
         "DIVISLAB.NS", "LAURUSLABS.NS", "SYNGENE.NS", "SOLARA.NS", "SMSPHARMA.NS",
         "GRANULES.NS", "NEULANDLAB.NS", "AARTIPHARM.NS", "SUPRIYA.NS", "SUDEEPPHRM.NS",
-        "ANTHEM.NS", "SAILIFE.NS", "ALIVUS.NS", "RPGLIFE.NS", "NGLFINE.NS",
-        "GUJTHEM.NS", "VIYASH.NS", "CONCORDBIO.NS"
+        "ANTHEM.NS", "SAILIFE.NS"
     ],
     "8. Chemicals & Petrochemicals": [
         "SRF.NS", "DEEPAKNTR.NS", "PIIND.NS", "TATACHEM.NS", "AARTIIND.NS",
         "NAVINFLUOR.NS", "FLUOROCHEM.NS", "ATUL.NS", "FINEORG.NS", "SUMICHEM.NS",
-        "VINATIORGA.NS", "ALKYLAMINE.NS", "BALAMINES.NS", "NOCIL.NS", "HSCL.NS",
-        "CLEAN.NS", "ANURAS.NS", "AETHER.NS", "ROSSARI.NS", "EPIGRAL.NS",
-        "PRIVISCL.NS", "CAMLINFINE.NS", "PCBL.NS", "GUJALKALI.NS", "GRAUWEIL.NS"
+        "VINATIORGA.NS", "ALKYLAMINE.NS"
     ],
     "9. Agrochemicals & Fertilizers": [
         "UPL.NS", "PIIND.NS", "COROMANDEL.NS", "BAYERCROP.NS", "SUMICHEM.NS",
-        "FACT.NS", "RCF.NS", "GNFC.NS", "GSFC.NS", "CHAMBLFERT.NS",
-        "DEEPAKFERT.NS", "SHARDACROP.NS", "DHANUKA.NS", "INSECTICID.NS", "BHARATRAS.NS",
-        "NACLIND.NS", "NFL.NS", "MBAPL.NS", "PARADEEP.NS"
+        "FACT.NS", "RCF.NS", "GNFC.NS", "GSFC.NS", "CHAMBLFERT.NS", "DEEPAKFERT.NS"
     ],
     "10. Metals, Mining & Steel": [
         "TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "JINDALSTEL.NS", "VEDL.NS",
         "SAIL.NS", "NMDC.NS", "COALINDIA.NS", "NATIONALUM.NS", "HINDZINC.NS",
-        "HINDCOPPER.NS", "JSL.NS", "APLAPOLLO.NS", "WELCORP.NS", "JINDALSAW.NS",
-        "RATNAMANI.NS", "GPIL.NS", "SHYAMMETL.NS", "KSL.NS", "MAHASTEEL.NS",
-        "PRAKASH.NS", "MOIL.NS", "KIOCL.NS", "ORISSAMINE.NS"
+        "HINDCOPPER.NS", "JSL.NS", "APLAPOLLO.NS"
     ],
     "11. Cement & Building Materials": [
         "ULTRACEMCO.NS", "AMBUJACEM.NS", "ACC.NS", "SHREECEM.NS", "DALBHARAT.NS",
-        "JSWCEMENT.NS", "RAMCOCEM.NS", "JKCEMENT.NS", "JKLAKSHMI.NS", "HEIDELBERG.NS",
-        "STARCEMENT.NS", "MANGLMCEM.NS", "BIRLACORPN.NS", "SAGCEM.NS", "KCP.NS",
-        "PRSMJOHNSN.NS", "ORIENTCEM.NS", "ASIANPAINT.NS", "BERGEPAINT.NS", "INDIGOPNTS.NS", "KANSAINER.NS"
+        "JSWCEMENT.NS", "RAMCOCEM.NS", "JKCEMENT.NS", "JKLAKSHMI.NS", "ASIANPAINT.NS",
+        "BERGEPAINT.NS", "INDIGOPNTS.NS"
     ],
     "12. Real Estate & Urban Developers": [
         "DLF.NS", "LODHA.NS", "GODREJPROP.NS", "OBEROIRLTY.NS", "PRESTIGE.NS",
-        "PHOENIXLTD.NS", "BRIGADE.NS", "SOBHA.NS", "SIGNATURE.NS", "ANANTRAJ.NS",
-        "MAHLIFE.NS", "SUNTECK.NS", "PURVA.NS", "KOLTEPATIL.NS", "ASHIANA.NS",
-        "OMAXE.NS", "MARATHON.NS", "AJMERA.NS", "HUBTOWN.NS", "ARKADE.NS",
-        "RUSTOMJEE.NS", "MAXESTATES.NS"
+        "PHOENIXLTD.NS", "BRIGADE.NS", "SOBHA.NS", "SIGNATURE.NS", "ANANTRAJ.NS"
     ],
     "13. Infrastructure, EPC & Rail": [
         "LT.NS", "RVNL.NS", "IRCON.NS", "NCC.NS", "NBCC.NS",
         "PNCINFRA.NS", "GRINFRA.NS", "DBL.NS", "KNRCON.NS", "HCC.NS",
-        "AFCONS.NS", "ASHOKA.NS", "HGINFRA.NS", "CEIGALL.NS", "PSPPROJECT.NS",
-        "AHLUCONT.NS", "JKIL.NS", "PATELENG.NS", "GPTINFRA.NS", "BAJEL.NS",
-        "TRANSRAILL.NS", "TITAGARH.NS", "TEXRAIL.NS"
+        "AFCONS.NS", "TITAGARH.NS"
     ],
     "14. Power Generation & Utilities": [
         "NTPC.NS", "TATAPOWER.NS", "JSWENERGY.NS", "POWERGRID.NS", "ADANIPOWER.NS",
-        "ADANIENSOL.NS", "NHPC.NS", "SJVN.NS", "CESC.NS", "TORNTPOWER.NS",
-        "NLCINDIA.NS", "RTNPOWER.NS", "JPPOWER.NS", "BGRENERGY.NS", "GIPCL.NS",
-        "GMRP&UI.NS", "PTC.NS"
+        "ADANIENSOL.NS", "NHPC.NS", "SJVN.NS", "CESC.NS", "TORNTPOWER.NS"
     ],
     "15. Renewable Energy & Green Transition": [
         "ADANIGREEN.NS", "SUZLON.NS", "INOXWIND.NS", "WAAREEENER.NS", "WAAREERTL.NS",
-        "PREMIERENE.NS", "IREDA.NS", "NTPCGREEN.NS", "KPIGREEN.NS", "SWSOLAR.NS",
-        "BORORENEW.NS", "INOXGREEN.NS", "VIKRAMSOLR.NS", "CLEANMAX.NS", "WEBELSOLAR.NS",
-        "SAATVIKGL.NS", "UEL.NS"
+        "PREMIERENE.NS", "IREDA.NS", "NTPCGREEN.NS", "KPIGREEN.NS", "SWSOLAR.NS"
     ],
     "16. Electrical Equipment & Cables": [
         "ABB.NS", "SIEMENS.NS", "BHEL.NS", "CGPOWER.NS", "POWERINDIA.NS",
-        "GVT&D.NS", "HAVELLS.NS", "POLYCAB.NS", "KEI.NS", "FINCABLES.NS",
-        "RRKABEL.NS", "VOLTAMP.NS", "TARIL.NS", "ENRIN.NS", "SCHNEIDER.NS",
-        "HPL.NS", "GENUSPOWER.NS", "INDOTECH.NS", "QPOWER.NS", "TDPOWERSYS.NS",
-        "SPECTRUM.NS", "DIACABS.NS"
+        "GVT&D.NS", "HAVELLS.NS", "POLYCAB.NS", "KEI.NS", "FINCABLES.NS", "RRKABEL.NS"
     ],
     "17. Defense, Aerospace & Space Tech": [
         "HAL.NS", "BEL.NS", "BDL.NS", "MAZDOCK.NS", "COCHINSHIP.NS",
-        "GRSE.NS", "BEML.NS", "PARAS.NS", "DATAPATTNS.NS", "MTARTECH.NS",
-        "ZENTEC.NS", "IDEAFORGE.NS", "APOLLO.NS", "KRISHNADEF.NS", "SWANDEF.NS",
-        "SIKA.NS", "ROSSTECH.NS", "UNIMECH.NS", "DYNAMATECH.NS", "AZAD.NS"
+        "GRSE.NS", "BEML.NS", "PARAS.NS", "DATAPATTNS.NS", "MTARTECH.NS", "ZENTEC.NS"
     ],
     "18. Oil, Gas & Energy Distribution": [
         "RELIANCE.NS", "ONGC.NS", "IOC.NS", "BPCL.NS", "HINDPETRO.NS",
-        "GAIL.NS", "PETRONET.NS", "IGL.NS", "MGL.NS", "ATGL.NS",
-        "OIL.NS", "MRPL.NS", "CHENNPETRO.NS", "AEGISLOG.NS", "GULFOILLUB.NS",
-        "CASTROLIND.NS", "CONFIPET.NS", "HINDOILEXP.NS"
+        "GAIL.NS", "PETRONET.NS", "IGL.NS", "MGL.NS", "ATGL.NS", "OIL.NS"
     ],
     "19. NBFCs & Retail Lending": [
         "BAJFINANCE.NS", "BAJAJFINSV.NS", "CHOLAFIN.NS", "SHRIRAMFIN.NS", "MUTHOOTFIN.NS",
-        "POONAWALLA.NS", "M&MFIN.NS", "SUNDARMFIN.NS", "LTF.NS", "IIFL.NS",
-        "MANAPPURAM.NS", "AADHARHFC.NS", "CANFINHOME.NS", "HOMEFIRST.NS", "APTUS.NS",
-        "LICHSGFIN.NS", "HUDCO.NS", "PNBHOUSING.NS", "FIVESTAR.NS", "CREDITACC.NS",
-        "FUSION.NS", "ARMANFIN.NS", "SPANDANA.NS", "SBFC.NS", "PAISALO.NS",
-        "SATIN.NS", "SGFIN.NS"
+        "POONAWALLA.NS", "M&MFIN.NS", "SUNDARMFIN.NS", "LTF.NS", "IIFL.NS", "MANAPPURAM.NS"
     ],
     "20. Capital Markets, Exchanges & Wealth": [
         "BSE.NS", "MCX.NS", "CDSL.NS", "CAMS.NS", "KFINTECH.NS",
-        "ANGELONE.NS", "360ONE.NS", "NUVAMA.NS", "MOTILALOFS.NS", "ANANDRATHI.NS",
-        "GEOJITFSL.NS", "SMCGLOBAL.NS", "SHAREINDIA.NS", "IEX.NS", "HDFCAMC.NS",
-        "UTIAMC.NS", "NAM-INDIA.NS", "CRAMC.NS", "SBIFUNDS.NS", "CRISIL.NS",
-        "ICRA.NS", "CARERATING.NS"
+        "ANGELONE.NS", "360ONE.NS", "NUVAMA.NS", "MOTILALOFS.NS", "ANANDRATHI.NS", "HDFCAMC.NS"
     ],
     "21. FMCG & Packaged Foods": [
         "HINDUNILVR.NS", "ITC.NS", "NESTLEIND.NS", "BRITANNIA.NS", "DABUR.NS",
-        "GODREJCP.NS", "MARICO.NS", "TATACONSUM.NS", "VBL.NS", "COLPAL.NS",
-        "PATANJALI.NS", "EMAMILTD.NS", "PGHH.NS", "GILLETTE.NS", "JYOTHYLAB.NS",
-        "HONASA.NS", "ZYDUSWELL.NS", "BIKAJI.NS", "DODLA.NS", "HATSUN.NS",
-        "HERITGFOOD.NS", "PARAGMILK.NS", "LTFOODS.NS", "KRBL.NS", "AVADHSUGAR.NS",
-        "BALRAMCHIN.NS", "RENUKA.NS", "BANARISUG.NS", "DALMIASUG.NS"
+        "GODREJCP.NS", "MARICO.NS", "TATACONSUM.NS", "VBL.NS", "COLPAL.NS", "PATANJALI.NS"
     ],
     "22. Retail, Consumer Brands & Footwear": [
-        "DMART.NS", "TRENT.NS", "V2RETAIL.NS", "VMM.NS", "STYLEBAAZA.NS",
-        "CANTABIL.NS", "SHOPERSTOP.NS", "NYKAA.NS", "SWIGGY.NS", "NAUKRI.NS",
-        "CARTRADE.NS", "MEESHO.NS", "FIRSTCRY.NS", "URBANCO.NS", "ZAGGLE.NS",
-        "BATAINDIA.NS", "RELAXO.NS", "CAMPUS.NS", "METROBRAND.NS", "REDTAPE.NS",
-        "SAFARI.NS", "VIPIND.NS", "CELLO.NS", "STOVEKRAFT.NS", "TTKPRESTIG.NS",
-        "HAWKINCOOK.NS", "CROMPTON.NS", "VOLTAS.NS", "BLUESTARCO.NS", "WHIRLPOOL.NS",
-        "IFBIND.NS", "LGEINDIA.NS", "DIXON.NS"
+        "DMART.NS", "TRENT.NS", "V2RETAIL.NS", "STYLEBAAZA.NS", "NYKAA.NS",
+        "SWIGGY.NS", "NAUKRI.NS", "BATAINDIA.NS", "RELAXO.NS", "CAMPUS.NS", "METROBRAND.NS"
     ],
     "23. Hotels, Hospitality & Travel": [
         "INDHOTEL.NS", "EIHOTEL.NS", "THELEELA.NS", "CHALET.NS", "LEMONTREE.NS",
-        "PARKHOTELS.NS", "SAMHI.NS", "JUNIPER.NS", "EIHAHOTELS.NS", "ITDC.NS",
-        "TAJGVK.NS", "VENTIVE.NS", "BRIGHOTEL.NS", "WONDERLA.NS", "CORDELIA.NS",
-        "TRAVELFOOD.NS", "YATRA.NS", "IXIGO.NS", "TBOTEK.NS", "INDIGO.NS", "EASEMYTRIP.NS"
+        "PARKHOTELS.NS", "INDIGO.NS", "YATRA.NS", "IXIGO.NS", "EASEMYTRIP.NS"
     ],
     "24. Logistics, Shipping & Transportation": [
         "ADANIPORTS.NS", "CONCOR.NS", "DELHIVERY.NS", "BLUEDART.NS", "INDIGO.NS",
-        "SCI.NS", "GESHIP.NS", "TCI.NS", "TCIEXP.NS", "VRLLOG.NS",
-        "MAHLOG.NS", "ALLCARGO.NS", "JSWINFRA.NS", "GPPL.NS", "GMRAIRPORT.NS",
-        "SHADOWFAX.NS", "SHIPROCKET.NS", "LEAPIND.NS", "SEAMECLTD.NS", "TVSSCS.NS"
+        "SCI.NS", "GESHIP.NS", "TCI.NS", "TCIEXP.NS", "VRLLOG.NS", "MAHLOG.NS"
     ],
     "25. Textiles, Apparel & Innerwear": [
         "PAGEIND.NS", "RAYMOND.NS", "RAYMONDLSL.NS", "ABFRL.NS", "ARVINDFASN.NS",
-        "ARVIND.NS", "KPRMILL.NS", "TRIDENT.NS", "WELSPUNLIV.NS", "VTL.NS",
-        "NITINSPIN.NS", "KITEX.NS", "GOKEX.NS", "SPAL.NS", "KKCL.NS",
-        "LUXIND.NS", "DOLLAR.NS", "SIYSIL.NS", "SANGAMIND.NS", "FILATEX.NS",
-        "INDORAMA.NS", "JINDWORLD.NS", "SPORTKING.NS", "AYMSYNTEX.NS"
+        "ARVIND.NS", "KPRMILL.NS", "TRIDENT.NS", "WELSPUNLIV.NS", "VTL.NS"
     ],
     "26. Telecom & Digital Communications": [
         "BHARTIARTL.NS", "BHARTIHEXA.NS", "IDEA.NS", "INDUSTOWER.NS", "TATACOMM.NS",
-        "TEJASNET.NS", "HFCL.NS", "ROUTE.NS", "TANLA.NS", "STLTECH.NS",
-        "OPTIEMUS.NS", "VINDHYATEL.NS", "TTML.NS", "HATHWAY.NS"
+        "TEJASNET.NS", "HFCL.NS", "ROUTE.NS", "TANLA.NS", "STLTECH.NS"
     ],
     "27. Nifty Jewellery & Watches Equal-Weight": [
         "TITAN.NS", "KALYANKJIL.NS", "LALITHAA.NS", "SKYGOLD.NS", "PCJEWELLER.NS",
@@ -206,11 +143,11 @@ def format_nse_ticker(raw_sym):
         sym += ".NS"
     return sym
 
-# --- 2. FAST CACHED DATA & CALCULATION ENGINE ---
+# --- 2. HIGH SPEED CACHED DATA FETCHING ---
 @st.cache_data(ttl=3600)
-def fetch_stock_data(ticker):
+def fetch_stock_data(ticker, period="15y"):
     try:
-        df = yf.Ticker(ticker).history(period="15y", auto_adjust=True)
+        df = yf.Ticker(ticker).history(period=period, auto_adjust=True)
         if not df.empty and "Close" in df.columns:
             df = df[["Open", "High", "Low", "Close"]]
             df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
@@ -230,8 +167,9 @@ def fetch_benchmark_nifty500():
     except Exception:
         return pd.Series(dtype=float)
 
-def compute_equal_weight_index(tickers, base_val=1000.0):
-    all_data = {t: fetch_stock_data(t) for t in tickers}
+@st.cache_data(ttl=3600)
+def compute_equal_weight_index(tickers, base_val=1000.0, period="15y"):
+    all_data = {t: fetch_stock_data(t, period=period) for t in tickers}
     valid = [t for t in tickers if not all_data[t].empty]
     if not valid:
         return pd.DataFrame(), {}
@@ -319,7 +257,7 @@ main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
 ])
 
 # ==============================================================================
-# TAB 1: SINGLE SECTOR CANDLESTICKS & ZOOM (100% PRESERVED)
+# TAB 1: SINGLE SECTOR CANDLESTICKS & ZOOM (FAST & PRESERVED)
 # ==============================================================================
 with main_tab1:
     st.sidebar.header("⚙️ Single Sector Controls")
@@ -354,7 +292,9 @@ with main_tab1:
     if not selected_stocks:
         st.warning("Please select at least one stock.")
     else:
-        index_df, all_data = compute_equal_weight_index(selected_stocks, base_val)
+        with st.spinner("Loading sector data..."):
+            index_df, all_data = compute_equal_weight_index(selected_stocks, base_val, period="15y")
+            
         if index_df.empty:
             st.error("No market data returned.")
         else:
@@ -451,11 +391,11 @@ with main_tab2:
     days = days_map[lookback_choice]
 
     if comp_sectors:
-        with st.spinner("Calculating sector curves & benchmark..."):
+        with st.spinner("Loading sector comparison & benchmark..."):
             nifty500 = fetch_benchmark_nifty500()
             fig_multi = go.Figure()
 
-            # Plot Nifty 500 Benchmark: Bold, Distinct Amber/Crimson (Visible on Light & Dark)
+            # Nifty 500 Benchmark: High-Contrast Bold Amber Line
             if not nifty500.empty:
                 cutoff_bench = nifty500.index.max() - pd.Timedelta(days=days)
                 b_slice = nifty500[nifty500.index >= cutoff_bench]
@@ -468,7 +408,6 @@ with main_tab2:
                         opacity=0.95
                     ))
 
-            # Vibrant Color Cycle for Selected Sectors
             vibrant_colors = [
                 "#2962FF", "#00C853", "#AA00FF", "#00B8D4", "#D50000",
                 "#FFD600", "#FF1744", "#304FFE", "#00BFA5", "#C51162"
@@ -476,7 +415,7 @@ with main_tab2:
 
             for idx_color, sec in enumerate(comp_sectors):
                 stk_list = st.session_state.sectors[sec]
-                s_idx, _ = compute_equal_weight_index(stk_list)
+                s_idx, _ = compute_equal_weight_index(stk_list[:8], period="5y") # optimized for fast charting
                 if not s_idx.empty:
                     s_cut = s_idx.index.max() - pd.Timedelta(days=days)
                     s_slice = s_idx.loc[s_idx.index >= s_cut, "Close"]
@@ -489,7 +428,6 @@ with main_tab2:
                             line=dict(width=2.5, color=color_choice)
                         ))
 
-            # Clean Universal Legend Design (Works on both Light and Dark themes)
             fig_multi.update_layout(
                 title=f"Sector Relative Performance vs Nifty 500 ({lookback_choice} Lookback, Base = 100)",
                 yaxis_title="Normalized Performance (Base = 100)",
@@ -510,7 +448,7 @@ with main_tab2:
             st.plotly_chart(fig_multi, use_container_width=True)
 
 # ==============================================================================
-# TAB 3: SECTOR MOMENTUM & TREND LEADERBOARD (AUTOMATIC DATA LOADING)
+# TAB 3: SECTOR MOMENTUM & TREND LEADERBOARD (FAST CACHED CALCULATION)
 # ==============================================================================
 with main_tab3:
     st.subheader("🧠 Sector Momentum, Smoothness & Trend Leaderboard")
@@ -528,15 +466,15 @@ with main_tab3:
 
     win_days = {"1 Month": 30, "3 Months": 90, "6 Months": 180, "1 Year": 365}[primary_window]
 
-    # Automatically calculates and renders without requiring any button click!
-    with st.spinner(f"Calculating quantitative momentum & trend quality across all 27 sectors for {primary_window}..."):
-        leaderboard_data = []
-
-        for sec_name, tickers in st.session_state.sectors.items():
-            # Sample top 12 liquid stocks for fast multi-sector analysis
-            s_idx, s_all = compute_equal_weight_index(tickers[:12])
+    # Fast Cached Multi-Sector Analyzer (takes 1-2 seconds on second load)
+    @st.cache_data(ttl=3600)
+    def calculate_cached_leaderboard(sectors_dict, days_back):
+        leaderboard = []
+        for sec_name, tickers in sectors_dict.items():
+            sample_tickers = tickers[:6] # Top 6 liquid pillars per sector for rapid momentum scoring
+            s_idx, s_all = compute_equal_weight_index(sample_tickers, period="2y")
             if not s_idx.empty:
-                cut = s_idx.index.max() - pd.Timedelta(days=win_days)
+                cut = s_idx.index.max() - pd.Timedelta(days=days_back)
                 p_slice = s_idx.loc[s_idx.index >= cut, "Close"]
 
                 if len(p_slice) >= 4:
@@ -545,10 +483,9 @@ with main_tab3:
                     r2 = calc_r_squared(p_slice)
                     shp = calc_sharpe(p_slice)
 
-                    # Breadth Calculation: Gainers vs Losers
                     gainers = 0
                     valid_count = 0
-                    for t in tickers[:12]:
+                    for t in sample_tickers:
                         if t in s_all and not s_all[t].empty:
                             st_slice = s_all[t]["Close"][s_all[t].index >= cut]
                             if len(st_slice) >= 2:
@@ -557,7 +494,7 @@ with main_tab3:
                                     gainers += 1
                     breadth_pct = (gainers / valid_count * 100) if valid_count > 0 else 0.0
 
-                    leaderboard_data.append({
+                    leaderboard.append({
                         "Sector": sec_name,
                         "Return (%)": round(ret, 2),
                         "Kaufman Ratio (KER)": round(ker, 3),
@@ -570,35 +507,34 @@ with main_tab3:
                         "_shp_raw": shp,
                         "_breadth_raw": breadth_pct
                     })
+        return leaderboard
 
-        if leaderboard_data:
-            df_lead = pd.DataFrame(leaderboard_data)
-            
-            # Derive Composite Momentum Score (0 - 100)
-            ret_p = df_lead["_ret_raw"].rank(pct=True)
-            ker_p = df_lead["_ker_raw"].rank(pct=True)
-            r2_p  = df_lead["_r2_raw"].rank(pct=True)
-            
-            # Directional multiplier so negative trends don't get falsely inflated
-            upward_multiplier = np.where(df_lead["_ret_raw"] > 0, 1.0, 0.3)
-            df_lead["Composite Momentum Score"] = np.round((0.40 * ret_p + 0.30 * r2_p + 0.30 * ker_p) * upward_multiplier * 100, 1)
+    with st.spinner(f"Analyzing all 27 sectors for {primary_window}..."):
+        raw_leaderboard = calculate_cached_leaderboard(st.session_state.sectors, win_days)
 
-            # Sorting Map
-            sort_col_map = {
-                "Composite Momentum Score": "Composite Momentum Score",
-                "Total Return (%)": "_ret_raw",
-                "Kaufman Efficiency Ratio (Smoothness)": "_ker_raw",
-                "R-Squared (Trend Fit)": "_r2_raw",
-                "Sharpe Ratio": "_shp_raw",
-                "Breadth (% Gainers)": "_breadth_raw"
-            }
-            df_lead = df_lead.sort_values(by=sort_col_map[sort_metric], ascending=False)
-            display_cols = ["Sector", "Composite Momentum Score", "Return (%)", "Kaufman Ratio (KER)", "R-Squared (Trend)", "Sharpe Ratio", "Breadth (Gainers/Total)"]
-            
-            st.dataframe(df_lead[display_cols], use_container_width=True)
-            
-            top_sec = df_lead.iloc[0]["Sector"]
-            st.success(f"🏆 Top Momentum Leader: **{top_sec}** with a Momentum Score of **{df_lead.iloc[0]['Composite Momentum Score']}/100** and Return of **{df_lead.iloc[0]['Return (%)']}%**")
+    if raw_leaderboard:
+        df_lead = pd.DataFrame(raw_leaderboard)
+        ret_p = df_lead["_ret_raw"].rank(pct=True)
+        ker_p = df_lead["_ker_raw"].rank(pct=True)
+        r2_p  = df_lead["_r2_raw"].rank(pct=True)
+        upward_multiplier = np.where(df_lead["_ret_raw"] > 0, 1.0, 0.3)
+        df_lead["Composite Momentum Score"] = np.round((0.40 * ret_p + 0.30 * r2_p + 0.30 * ker_p) * upward_multiplier * 100, 1)
+
+        sort_col_map = {
+            "Composite Momentum Score": "Composite Momentum Score",
+            "Total Return (%)": "_ret_raw",
+            "Kaufman Efficiency Ratio (Smoothness)": "_ker_raw",
+            "R-Squared (Trend Fit)": "_r2_raw",
+            "Sharpe Ratio": "_shp_raw",
+            "Breadth (% Gainers)": "_breadth_raw"
+        }
+        df_lead = df_lead.sort_values(by=sort_col_map[sort_metric], ascending=False)
+        display_cols = ["Sector", "Composite Momentum Score", "Return (%)", "Kaufman Ratio (KER)", "R-Squared (Trend)", "Sharpe Ratio", "Breadth (Gainers/Total)"]
+        
+        st.dataframe(df_lead[display_cols], use_container_width=True)
+        
+        top_sec = df_lead.iloc[0]["Sector"]
+        st.success(f"🏆 Top Momentum Leader: **{top_sec}** with a Momentum Score of **{df_lead.iloc[0]['Composite Momentum Score']}/100** and Return of **{df_lead.iloc[0]['Return (%)']}%**")
 
 # ==============================================================================
 # TAB 4: STOCK ATTRIBUTION & DRIVER DEEP-DIVE
@@ -616,7 +552,8 @@ with main_tab4:
     att_days = {"1 Month": 30, "3 Months": 90, "6 Months": 180, "1 Year": 365}[att_window]
 
     stk_constituents = st.session_state.sectors[att_sector]
-    sec_idx, sec_data = compute_equal_weight_index(stk_constituents)
+    with st.spinner(f"Loading constituents for {att_sector}..."):
+        sec_idx, sec_data = compute_equal_weight_index(stk_constituents, period="2y")
 
     if not sec_idx.empty:
         att_cut = sec_idx.index.max() - pd.Timedelta(days=att_days)
