@@ -8,8 +8,8 @@ st.set_page_config(page_title="Equal-Weighted Sector Indices", layout="wide", pa
 st.title("🏛️ Custom Equal-Weighted Index Dashboard")
 st.caption("15-Year Historical Candlestick Charts with Quarterly Rebalancing | Built from Scratch")
 
-# Sector Presets (Editable)
-SECTORS = {
+# 1. Initialize Custom Sectors in Session State (persists during your session)
+DEFAULT_SECTORS = {
     "Nifty Bank Equal-Weight": [
         "HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS",
         "PNB.NS", "UNIONBANK.NS", "BANKBARODA.NS", "CANBK.NS", "FEDERALBNK.NS",
@@ -26,16 +26,57 @@ SECTORS = {
     ]
 }
 
-# Sidebar Controls
-st.sidebar.header("⚙️ Index Controls")
-selected_sector = st.sidebar.selectbox("Choose Sector Index", list(SECTORS.keys()))
-default_constituents = SECTORS[selected_sector]
+if "sectors" not in st.session_state:
+    st.session_state.sectors = {k: list(v) for k, v in DEFAULT_SECTORS.items()}
 
+# Helper function to ensure .NS suffix
+def format_nse_ticker(raw_sym):
+    sym = raw_sym.strip().upper()
+    if not sym.endswith(".NS") and not sym.endswith(".BO"):
+        sym += ".NS"
+    return sym
+
+# --- SIDEBAR CONTROLS ---
+st.sidebar.header("⚙️ Index Controls")
+
+# Sector Selection
+sector_options = list(st.session_state.sectors.keys())
+selected_sector = st.sidebar.selectbox("Choose Sector Index", sector_options)
+
+# Form to Create a Brand-New Sector Directly in the UI
+with st.sidebar.expander("✨ Create New Custom Sector"):
+    new_sec_name = st.text_input("New Sector Name (e.g. Defense)").strip()
+    new_sec_tickers_raw = st.text_area("Stocks (comma-separated, e.g. HAL, BEL, MAZDOCK)").strip()
+    if st.button("Create Sector"):
+        if new_sec_name and new_sec_tickers_raw:
+            parsed_tickers = [format_nse_ticker(t) for t in new_sec_tickers_raw.replace("\n", ",").split(",") if t.strip()]
+            if parsed_tickers:
+                st.session_state.sectors[new_sec_name] = parsed_tickers
+                st.success(f"Created '{new_sec_name}' with {len(parsed_tickers)} stocks!")
+                st.rerun()
+        else:
+            st.error("Please provide both a sector name and at least one stock.")
+
+# Constituents Multiselect for Selected Sector
+current_constituents = st.session_state.sectors[selected_sector]
 selected_stocks = st.sidebar.multiselect(
-    "Constituents (Add/Remove Stocks)",
-    options=default_constituents,
-    default=default_constituents
+    "Constituents (Toggle Stocks)",
+    options=current_constituents,
+    default=current_constituents
 )
+
+# Quick Form to Add a Single Stock to the Current Sector
+with st.sidebar.expander(f"➕ Add Stock to '{selected_sector}'"):
+    new_stock_input = st.text_input("Enter NSE Ticker (e.g. INDUSINDBK or BANDHANBNK)").strip()
+    if st.button("Add to Current Sector"):
+        if new_stock_input:
+            formatted_stock = format_nse_ticker(new_stock_input)
+            if formatted_stock not in current_constituents:
+                st.session_state.sectors[selected_sector].append(formatted_stock)
+                st.success(f"Added {formatted_stock}!")
+                st.rerun()
+            else:
+                st.info(f"{formatted_stock} is already in this sector.")
 
 base_value = st.sidebar.number_input("Starting Base Value", min_value=100.0, max_value=50000.0, value=1000.0, step=100.0)
 
@@ -43,26 +84,35 @@ if not selected_stocks:
     st.warning("Please select at least one stock to calculate the index.")
     st.stop()
 
-# Fast Data Loader with 1-hour cache
+# --- FAST CACHED DATA LOADER ---
 @st.cache_data(ttl=3600)
 def fetch_sector_data(tickers):
     data_dict = {}
     for t in tickers:
-        df = yf.Ticker(t).history(period="15y", auto_adjust=True)
-        if not df.empty:
-            df = df[["Open", "High", "Low", "Close"]]
-            df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
-            data_dict[t] = df
+        try:
+            df = yf.Ticker(t).history(period="15y", auto_adjust=True)
+            if not df.empty and "Close" in df.columns:
+                df = df[["Open", "High", "Low", "Close"]]
+                df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
+                data_dict[t] = df
+        except Exception:
+            pass
     return data_dict
 
 with st.spinner("Loading market data and computing index..."):
     all_data = fetch_sector_data(tuple(selected_stocks))
 
+# Validate that data was fetched
+valid_stocks = [t for t in selected_stocks if t in all_data and not all_data[t].empty]
+if not valid_stocks:
+    st.error("Could not retrieve market data for the selected stocks. Please verify the ticker symbols.")
+    st.stop()
+
 # Align Prices
-close_df = pd.DataFrame({t: all_data[t]["Close"] for t in selected_stocks if t in all_data}).sort_index().ffill()
-open_df  = pd.DataFrame({t: all_data[t]["Open"]  for t in selected_stocks if t in all_data}).sort_index().fillna(close_df)
-high_df  = pd.DataFrame({t: all_data[t]["High"]  for t in selected_stocks if t in all_data}).sort_index().fillna(close_df)
-low_df   = pd.DataFrame({t: all_data[t]["Low"]   for t in selected_stocks if t in all_data}).sort_index().fillna(close_df)
+close_df = pd.DataFrame({t: all_data[t]["Close"] for t in valid_stocks}).sort_index().ffill()
+open_df  = pd.DataFrame({t: all_data[t]["Open"]  for t in valid_stocks}).sort_index().fillna(close_df)
+high_df  = pd.DataFrame({t: all_data[t]["High"]  for t in valid_stocks}).sort_index().fillna(close_df)
+low_df   = pd.DataFrame({t: all_data[t]["Low"]   for t in valid_stocks}).sort_index().fillna(close_df)
 
 # Quarterly Rebalancing Engine
 quarter_labels = close_df.index.to_period("Q")
@@ -114,7 +164,7 @@ m1, m2, m3, m4 = st.columns(4)
 m1.metric("Current Index Value", f"{latest_val:,.2f}")
 m2.metric("Total 15Y Return", f"{tot_return:+,.1f}%")
 m3.metric("Max 15Y Drawdown", f"{max_dd:.1f}%")
-m4.metric("Active Constituents", f"{len(selected_stocks)} Stocks")
+m4.metric("Active Constituents", f"{len(valid_stocks)} Stocks")
 
 # --- TRADINGVIEW-STYLE TABS ---
 tab_custom, tab_macro, tab_constituents = st.tabs([
@@ -168,7 +218,7 @@ with tab_custom:
     w1.metric(f"Return (Last {num_weeks} Weeks)", f"{win_return:+,.2f}%")
     w2.metric("Window High", f"{win_high:,.2f}")
     w3.metric("Window Low", f"{win_low:,.2f}")
-    w4.metric("Total Candles Displayed", f"{len(chart_window_data)}")
+    w4.metric("Candles Displayed", f"{len(chart_window_data)}")
     
     # Render Custom Candlestick Chart
     fig_custom = go.Figure(data=[
@@ -229,7 +279,7 @@ with tab_macro:
 with tab_constituents:
     st.subheader(f"⚖️ {selected_sector} Constituents")
     breakdown_list = []
-    for t in selected_stocks:
+    for t in valid_stocks:
         if t in all_data and not all_data[t].empty:
             stk_first = all_data[t]["Close"].iloc[0]
             stk_latest = all_data[t]["Close"].iloc[-1]
@@ -239,7 +289,7 @@ with tab_constituents:
                 "Latest Close (Rs)": round(stk_latest, 2),
                 "Historical Return (%)": round(stk_ret, 1),
                 "First Available Date": str(all_data[t].index[0].date()),
-                "Target Weight": f"{round(100/len(selected_stocks), 2)}%"
+                "Target Weight": f"{round(100/len(valid_stocks), 2)}%"
             })
     
     st.dataframe(pd.DataFrame(breakdown_list), use_container_width=True)
