@@ -206,7 +206,7 @@ def format_nse_ticker(raw_sym):
         sym += ".NS"
     return sym
 
-# --- 2. CACHED DATA & INDEX ENGINE ---
+# --- 2. FAST CACHED DATA & CALCULATION ENGINE ---
 @st.cache_data(ttl=3600)
 def fetch_stock_data(ticker):
     try:
@@ -223,7 +223,7 @@ def fetch_stock_data(ticker):
 def fetch_benchmark_nifty500():
     try:
         df = yf.Ticker("^CRSLDX").history(period="15y", auto_adjust=True)
-        if df.empty:
+        if df.empty or len(df) < 10:
             df = yf.Ticker("^NSEI").history(period="15y", auto_adjust=True)
         df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
         return df["Close"]
@@ -276,7 +276,7 @@ def compute_equal_weight_index(tickers, base_val=1000.0):
     index_df = pd.DataFrame(records).set_index("Date")
     return index_df, all_data
 
-# --- 3. QUANTITATIVE METRICS FUNCTIONS ---
+# --- 3. QUANTITATIVE FORMULAS ---
 def calc_kaufman_efficiency(series):
     if len(series) < 2:
         return 0.0
@@ -367,7 +367,7 @@ with main_tab1:
 
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Current Value", f"{e_val:,.2f}")
-            c1.metric("Total 15Y Return", f"{tot_ret:+,.1f}%")
+            c2.metric("Total 15Y Return", f"{tot_ret:+,.1f}%")
             c3.metric("Max 15Y Drawdown", f"{m_dd:.1f}%")
             c4.metric("Active Stocks", f"{len(selected_stocks)}")
 
@@ -425,11 +425,11 @@ with main_tab1:
                 st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
 # ==============================================================================
-# TAB 2: MULTI-SECTOR COMPARISON VS NIFTY 500
+# TAB 2: MULTI-SECTOR COMPARISON VS NIFTY 500 (HIGH CONTRAST & VISIBLE LEGEND)
 # ==============================================================================
 with main_tab2:
-    st.subheader("📈 Multi-Sector Comparison Against Nifty 500")
-    st.caption("Compare multiple custom sectors on a single normalized chart (Base = 100) with the Nifty 500 benchmark in the background.")
+    st.subheader("📈 Multi-Sector Relative Performance vs Nifty 500")
+    st.caption("Compare multiple custom sectors on a single normalized chart (Base = 100) with Nifty 500 in the background.")
 
     col_m1, col_m2 = st.columns([3, 1])
     with col_m1:
@@ -455,7 +455,7 @@ with main_tab2:
             nifty500 = fetch_benchmark_nifty500()
             fig_multi = go.Figure()
 
-            # Plot Nifty 500 Reference Line in Background
+            # Plot Nifty 500 Benchmark: Bold, Distinct Amber/Crimson (Visible on Light & Dark)
             if not nifty500.empty:
                 cutoff_bench = nifty500.index.max() - pd.Timedelta(days=days)
                 b_slice = nifty500[nifty500.index >= cutoff_bench]
@@ -463,13 +463,18 @@ with main_tab2:
                     norm_bench = (b_slice / b_slice.iloc[0]) * 100.0
                     fig_multi.add_trace(go.Scatter(
                         x=norm_bench.index, y=norm_bench,
-                        mode="lines", name="NIFTY 500 (^CRSLDX)",
-                        line=dict(color="#ffffff", width=2.5, dash="dash"),
-                        opacity=0.7
+                        mode="lines", name="★ NIFTY 500 BENCHMARK",
+                        line=dict(color="#FF6D00", width=3.5, dash="dash"),
+                        opacity=0.95
                     ))
 
-            # Plot Each Selected Sector
-            for sec in comp_sectors:
+            # Vibrant Color Cycle for Selected Sectors
+            vibrant_colors = [
+                "#2962FF", "#00C853", "#AA00FF", "#00B8D4", "#D50000",
+                "#FFD600", "#FF1744", "#304FFE", "#00BFA5", "#C51162"
+            ]
+
+            for idx_color, sec in enumerate(comp_sectors):
                 stk_list = st.session_state.sectors[sec]
                 s_idx, _ = compute_equal_weight_index(stk_list)
                 if not s_idx.empty:
@@ -477,30 +482,43 @@ with main_tab2:
                     s_slice = s_idx.loc[s_idx.index >= s_cut, "Close"]
                     if not s_slice.empty:
                         norm_sec = (s_slice / s_slice.iloc[0]) * 100.0
+                        color_choice = vibrant_colors[idx_color % len(vibrant_colors)]
                         fig_multi.add_trace(go.Scatter(
                             x=norm_sec.index, y=norm_sec,
-                            mode="lines", name=sec, line=dict(width=2)
+                            mode="lines", name=sec,
+                            line=dict(width=2.5, color=color_choice)
                         ))
 
+            # Clean Universal Legend Design (Works on both Light and Dark themes)
             fig_multi.update_layout(
                 title=f"Sector Relative Performance vs Nifty 500 ({lookback_choice} Lookback, Base = 100)",
                 yaxis_title="Normalized Performance (Base = 100)",
-                template="plotly_dark",
-                height=600,
-                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, bgcolor="#1e222d")
+                height=620,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1.0,
+                    bgcolor="rgba(255, 255, 255, 0.9)",
+                    bordercolor="#888888",
+                    borderwidth=1,
+                    font=dict(color="#111111", size=12)
+                ),
+                margin=dict(l=10, r=10, t=80, b=10)
             )
             st.plotly_chart(fig_multi, use_container_width=True)
 
 # ==============================================================================
-# TAB 3: SECTOR MOMENTUM & TREND LEADERBOARD (INSIGHTS)
+# TAB 3: SECTOR MOMENTUM & TREND LEADERBOARD (AUTOMATIC DATA LOADING)
 # ==============================================================================
 with main_tab3:
     st.subheader("🧠 Sector Momentum, Smoothness & Trend Leaderboard")
-    st.caption("Identify institutional momentum and smooth trends using Kaufman Efficiency (KER), R-Squared, Sharpe, and Breadth.")
+    st.caption("Identify institutional momentum and smooth trends using Kaufman Efficiency (KER), R-Squared, Sharpe, and Market Breadth.")
 
     col_l1, col_l2 = st.columns(2)
     with col_l1:
-        primary_window = st.selectbox("Primary Lookback Period:", ["1 Month", "3 Months", "6 Months", "1 Year"], index=1)
+        primary_window = st.selectbox("Lookback Period:", ["1 Month", "3 Months", "6 Months", "1 Year"], index=1)
     with col_l2:
         sort_metric = st.selectbox(
             "Sort Sectors By:",
@@ -510,76 +528,77 @@ with main_tab3:
 
     win_days = {"1 Month": 30, "3 Months": 90, "6 Months": 180, "1 Year": 365}[primary_window]
 
-    if st.button("🚀 Calculate Sector Momentum Scorecard"):
-        with st.spinner("Analyzing all 27 sectors..."):
-            leaderboard_data = []
+    # Automatically calculates and renders without requiring any button click!
+    with st.spinner(f"Calculating quantitative momentum & trend quality across all 27 sectors for {primary_window}..."):
+        leaderboard_data = []
 
-            for sec_name, tickers in st.session_state.sectors.items():
-                s_idx, s_all = compute_equal_weight_index(tickers[:15]) # sample top 15 for speed
-                if not s_idx.empty:
-                    cut = s_idx.index.max() - pd.Timedelta(days=win_days)
-                    p_slice = s_idx.loc[s_idx.index >= cut, "Close"]
+        for sec_name, tickers in st.session_state.sectors.items():
+            # Sample top 12 liquid stocks for fast multi-sector analysis
+            s_idx, s_all = compute_equal_weight_index(tickers[:12])
+            if not s_idx.empty:
+                cut = s_idx.index.max() - pd.Timedelta(days=win_days)
+                p_slice = s_idx.loc[s_idx.index >= cut, "Close"]
 
-                    if len(p_slice) >= 5:
-                        ret = ((p_slice.iloc[-1] - p_slice.iloc[0]) / p_slice.iloc[0]) * 100
-                        ker = calc_kaufman_efficiency(p_slice)
-                        r2 = calc_r_squared(p_slice)
-                        shp = calc_sharpe(p_slice)
+                if len(p_slice) >= 4:
+                    ret = ((p_slice.iloc[-1] - p_slice.iloc[0]) / p_slice.iloc[0]) * 100
+                    ker = calc_kaufman_efficiency(p_slice)
+                    r2 = calc_r_squared(p_slice)
+                    shp = calc_sharpe(p_slice)
 
-                        # Breadth Calculation: Gainers vs Losers
-                        gainers = 0
-                        valid_count = 0
-                        for t in tickers:
-                            if t in s_all and not s_all[t].empty:
-                                st_slice = s_all[t]["Close"][s_all[t].index >= cut]
-                                if len(st_slice) >= 2:
-                                    valid_count += 1
-                                    if st_slice.iloc[-1] >= st_slice.iloc[0]:
-                                        gainers += 1
-                        breadth_pct = (gainers / valid_count * 100) if valid_count > 0 else 0.0
+                    # Breadth Calculation: Gainers vs Losers
+                    gainers = 0
+                    valid_count = 0
+                    for t in tickers[:12]:
+                        if t in s_all and not s_all[t].empty:
+                            st_slice = s_all[t]["Close"][s_all[t].index >= cut]
+                            if len(st_slice) >= 2:
+                                valid_count += 1
+                                if st_slice.iloc[-1] >= st_slice.iloc[0]:
+                                    gainers += 1
+                    breadth_pct = (gainers / valid_count * 100) if valid_count > 0 else 0.0
 
-                        leaderboard_data.append({
-                            "Sector": sec_name,
-                            "Return (%)": round(ret, 2),
-                            "Kaufman Ratio (KER)": round(ker, 3),
-                            "R-Squared (Trend)": round(r2, 3),
-                            "Sharpe Ratio": round(shp, 2),
-                            "Breadth (Gainers/Total)": f"{gainers}/{valid_count} ({round(breadth_pct, 1)}%)",
-                            "_ret_raw": ret,
-                            "_ker_raw": ker,
-                            "_r2_raw": r2,
-                            "_shp_raw": shp,
-                            "_breadth_raw": breadth_pct
-                        })
+                    leaderboard_data.append({
+                        "Sector": sec_name,
+                        "Return (%)": round(ret, 2),
+                        "Kaufman Ratio (KER)": round(ker, 3),
+                        "R-Squared (Trend)": round(r2, 3),
+                        "Sharpe Ratio": round(shp, 2),
+                        "Breadth (Gainers/Total)": f"{gainers}/{valid_count} ({round(breadth_pct, 1)}%)",
+                        "_ret_raw": ret,
+                        "_ker_raw": ker,
+                        "_r2_raw": r2,
+                        "_shp_raw": shp,
+                        "_breadth_raw": breadth_pct
+                    })
 
-            if leaderboard_data:
-                df_lead = pd.DataFrame(leaderboard_data)
-                
-                # Derive Composite Momentum Score (0 - 100)
-                ret_p = df_lead["_ret_raw"].rank(pct=True)
-                ker_p = df_lead["_ker_raw"].rank(pct=True)
-                r2_p  = df_lead["_r2_raw"].rank(pct=True)
-                
-                # Directional penalty if return is negative
-                upward_multiplier = np.where(df_lead["_ret_raw"] > 0, 1.0, 0.3)
-                df_lead["Composite Momentum Score"] = np.round((0.40 * ret_p + 0.30 * r2_p + 0.30 * ker_p) * upward_multiplier * 100, 1)
+        if leaderboard_data:
+            df_lead = pd.DataFrame(leaderboard_data)
+            
+            # Derive Composite Momentum Score (0 - 100)
+            ret_p = df_lead["_ret_raw"].rank(pct=True)
+            ker_p = df_lead["_ker_raw"].rank(pct=True)
+            r2_p  = df_lead["_r2_raw"].rank(pct=True)
+            
+            # Directional multiplier so negative trends don't get falsely inflated
+            upward_multiplier = np.where(df_lead["_ret_raw"] > 0, 1.0, 0.3)
+            df_lead["Composite Momentum Score"] = np.round((0.40 * ret_p + 0.30 * r2_p + 0.30 * ker_p) * upward_multiplier * 100, 1)
 
-                # Sorting
-                sort_col_map = {
-                    "Composite Momentum Score": "Composite Momentum Score",
-                    "Total Return (%)": "_ret_raw",
-                    "Kaufman Efficiency Ratio (Smoothness)": "_ker_raw",
-                    "R-Squared (Trend Fit)": "_r2_raw",
-                    "Sharpe Ratio": "_shp_raw",
-                    "Breadth (% Gainers)": "_breadth_raw"
-                }
-                df_lead = df_lead.sort_values(by=sort_col_map[sort_metric], ascending=False)
-                display_cols = ["Sector", "Composite Momentum Score", "Return (%)", "Kaufman Ratio (KER)", "R-Squared (Trend)", "Sharpe Ratio", "Breadth (Gainers/Total)"]
-                
-                st.dataframe(df_lead[display_cols], use_container_width=True)
-                
-                top_sec = df_lead.iloc[0]["Sector"]
-                st.success(f"🏆 Top Momentum Leader: **{top_sec}** with a Momentum Score of **{df_lead.iloc[0]['Composite Momentum Score']}/100** and Return of **{df_lead.iloc[0]['Return (%)']}%**")
+            # Sorting Map
+            sort_col_map = {
+                "Composite Momentum Score": "Composite Momentum Score",
+                "Total Return (%)": "_ret_raw",
+                "Kaufman Efficiency Ratio (Smoothness)": "_ker_raw",
+                "R-Squared (Trend Fit)": "_r2_raw",
+                "Sharpe Ratio": "_shp_raw",
+                "Breadth (% Gainers)": "_breadth_raw"
+            }
+            df_lead = df_lead.sort_values(by=sort_col_map[sort_metric], ascending=False)
+            display_cols = ["Sector", "Composite Momentum Score", "Return (%)", "Kaufman Ratio (KER)", "R-Squared (Trend)", "Sharpe Ratio", "Breadth (Gainers/Total)"]
+            
+            st.dataframe(df_lead[display_cols], use_container_width=True)
+            
+            top_sec = df_lead.iloc[0]["Sector"]
+            st.success(f"🏆 Top Momentum Leader: **{top_sec}** with a Momentum Score of **{df_lead.iloc[0]['Composite Momentum Score']}/100** and Return of **{df_lead.iloc[0]['Return (%)']}%**")
 
 # ==============================================================================
 # TAB 4: STOCK ATTRIBUTION & DRIVER DEEP-DIVE
@@ -614,7 +633,6 @@ with main_tab4:
                 s_series = sec_data[t]["Close"][sec_data[t].index >= att_cut]
                 if len(s_series) >= 2:
                     p_ret = ((s_series.iloc[-1] - s_series.iloc[0]) / s_series.iloc[0]) * 100
-                    # Equal-Weight Contribution
                     contr = p_ret / n_const
                     vol = s_series.pct_change().std() * np.sqrt(252) * 100
                     stk_ker = calc_kaufman_efficiency(s_series)
@@ -633,7 +651,6 @@ with main_tab4:
         if stock_rows:
             df_stocks = pd.DataFrame(stock_rows).sort_values(by="_contr_raw", ascending=False)
 
-            # Highlight Top Leaders vs Draggers
             top_col1, top_col2 = st.columns(2)
             with top_col1:
                 st.markdown("### 🚀 Top Rally Leaders (Biggest Positive Lift)")
