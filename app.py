@@ -38,7 +38,6 @@ selected_stocks = st.sidebar.multiselect(
 )
 
 base_value = st.sidebar.number_input("Starting Base Value", min_value=100.0, max_value=50000.0, value=1000.0, step=100.0)
-timeframe = st.sidebar.radio("Candlestick Timeframe", ["Monthly (15-Year Macro — Cleanest)", "Weekly (Medium-Term)", "Daily (Recent)"])
 
 if not selected_stocks:
     st.warning("Please select at least one stock to calculate the index.")
@@ -101,7 +100,7 @@ for q in unique_q:
 
 index_df = pd.DataFrame(index_records).set_index("Date")
 
-# Calculate Performance Metrics
+# Calculate Overall 15-Year Metrics
 start_val = index_df["Close"].iloc[0]
 latest_val = index_df["Close"].iloc[-1]
 tot_return = ((latest_val - start_val) / start_val) * 100
@@ -110,41 +109,137 @@ peak = index_df["Close"].cummax()
 dd = (index_df["Close"] - peak) / peak
 max_dd = dd.min() * 100
 
-# Metric Cards
+# Top Metric Cards
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Current Index Value", f"{latest_val:,.2f}")
-m2.metric("Total Return", f"{tot_return:+,.1f}%")
-m3.metric("Max Drawdown", f"{max_dd:.1f}%")
+m2.metric("Total 15Y Return", f"{tot_return:+,.1f}%")
+m3.metric("Max 15Y Drawdown", f"{max_dd:.1f}%")
 m4.metric("Active Constituents", f"{len(selected_stocks)} Stocks")
 
-# Resample based on user choice
-if "Monthly" in timeframe:
-    chart_data = index_df.resample("ME").agg({"Open":"first","High":"max","Low":"min","Close":"last"}).dropna()
-elif "Weekly" in timeframe:
-    chart_data = index_df.resample("W-FRI").agg({"Open":"first","High":"max","Low":"min","Close":"last"}).dropna()
-else:
-    chart_data = index_df
-
-# Interactive Candlestick Chart
-fig = go.Figure(data=[
-    go.Candlestick(
-        x=chart_data.index,
-        open=chart_data["Open"],
-        high=chart_data["High"],
-        low=chart_data["Low"],
-        close=chart_data["Close"],
-        increasing_line_color="#26a69a",
-        decreasing_line_color="#ef5350",
-        name=selected_sector
-    )
+# --- TRADINGVIEW-STYLE TABS ---
+tab_custom, tab_macro, tab_constituents = st.tabs([
+    "⏱️ Custom Window (Weeks / Range)",
+    "🌐 Full 15-Year Macro (Monthly)",
+    "⚖️ Constituent Stock Breakdown"
 ])
 
-fig.update_layout(
-    template="plotly_dark",
-    yaxis_title="Index Value",
-    xaxis_rangeslider_visible=False,
-    height=600,
-    margin=dict(l=10, r=10, t=30, b=10)
-)
+# --- TAB 1: CUSTOM TIMEFRAME BY NUMBER OF WEEKS ---
+with tab_custom:
+    st.subheader("🎯 Zoom Into a Specific Window")
+    
+    col_ctrl1, col_ctrl2 = st.columns([2, 1])
+    
+    with col_ctrl1:
+        num_weeks = st.slider(
+            "Select Lookback Window (in Weeks):",
+            min_value=1,
+            max_value=260,
+            value=12,
+            step=1,
+            help="Choose how many weeks of history to display (e.g., 4 weeks = 1 month, 52 weeks = 1 year)."
+        )
+        
+    with col_ctrl2:
+        candle_type = st.radio(
+            "Candle Granularity for this Window:",
+            ["Daily Candlesticks", "Weekly Candlesticks"],
+            index=0
+        )
+    
+    # Filter data to ONLY the chosen number of weeks
+    cutoff_date = index_df.index.max() - pd.Timedelta(weeks=num_weeks)
+    window_df = index_df[index_df.index >= cutoff_date]
+    
+    if "Weekly" in candle_type:
+        chart_window_data = window_df.resample("W-FRI").agg({
+            "Open": "first", "High": "max", "Low": "min", "Close": "last"
+        }).dropna()
+    else:
+        chart_window_data = window_df
 
-st.plotly_chart(fig, use_container_width=True)
+    # Window-specific metrics
+    win_start_val = window_df["Close"].iloc[0]
+    win_end_val = window_df["Close"].iloc[-1]
+    win_return = ((win_end_val - win_start_val) / win_start_val) * 100
+    win_high = window_df["High"].max()
+    win_low = window_df["Low"].min()
+    
+    w1, w2, w3, w4 = st.columns(4)
+    w1.metric(f"Return (Last {num_weeks} Weeks)", f"{win_return:+,.2f}%")
+    w2.metric("Window High", f"{win_high:,.2f}")
+    w3.metric("Window Low", f"{win_low:,.2f}")
+    w4.metric("Total Candles Displayed", f"{len(chart_window_data)}")
+    
+    # Render Custom Candlestick Chart
+    fig_custom = go.Figure(data=[
+        go.Candlestick(
+            x=chart_window_data.index,
+            open=chart_window_data["Open"],
+            high=chart_window_data["High"],
+            low=chart_window_data["Low"],
+            close=chart_window_data["Close"],
+            increasing_line_color="#26a69a",
+            decreasing_line_color="#ef5350",
+            name=f"{selected_sector} (Last {num_weeks} W)"
+        )
+    ])
+    
+    fig_custom.update_layout(
+        title=f"{selected_sector} — Candlesticks for Last {num_weeks} Weeks ({str(cutoff_date.date())} to {str(index_df.index.max().date())})",
+        template="plotly_dark",
+        yaxis_title="Index Value",
+        xaxis_rangeslider_visible=False,
+        height=600,
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    
+    st.plotly_chart(fig_custom, use_container_width=True)
+
+# --- TAB 2: FULL 15-YEAR MONTHLY MACRO ---
+with tab_macro:
+    st.subheader("🌐 Complete 15-Year Macro Overview (Monthly Candles)")
+    monthly_data = index_df.resample("ME").agg({
+        "Open": "first", "High": "max", "Low": "min", "Close": "last"
+    }).dropna()
+    
+    fig_macro = go.Figure(data=[
+        go.Candlestick(
+            x=monthly_data.index,
+            open=monthly_data["Open"],
+            high=monthly_data["High"],
+            low=monthly_data["Low"],
+            close=monthly_data["Close"],
+            increasing_line_color="#26a69a",
+            decreasing_line_color="#ef5350",
+            name="15Y Monthly"
+        )
+    ])
+    
+    fig_macro.update_layout(
+        title=f"{selected_sector} — 15-Year Historical Macro ({len(monthly_data)} Monthly Candlesticks)",
+        template="plotly_dark",
+        yaxis_title="Index Value",
+        xaxis_rangeslider_visible=False,
+        height=600,
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    st.plotly_chart(fig_macro, use_container_width=True)
+
+# --- TAB 3: CONSTITUENTS BREAKDOWN ---
+with tab_constituents:
+    st.subheader(f"⚖️ {selected_sector} Constituents")
+    breakdown_list = []
+    for t in selected_stocks:
+        if t in all_data and not all_data[t].empty:
+            stk_first = all_data[t]["Close"].iloc[0]
+            stk_latest = all_data[t]["Close"].iloc[-1]
+            stk_ret = ((stk_latest - stk_first) / stk_first) * 100
+            breakdown_list.append({
+                "Ticker": t,
+                "Latest Close (Rs)": round(stk_latest, 2),
+                "Historical Return (%)": round(stk_ret, 1),
+                "First Available Date": str(all_data[t].index[0].date()),
+                "Target Weight": f"{round(100/len(selected_stocks), 2)}%"
+            })
+    
+    st.dataframe(pd.DataFrame(breakdown_list), use_container_width=True)
