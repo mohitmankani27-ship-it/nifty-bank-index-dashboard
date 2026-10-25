@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from sector_backtest import render_backtest_tab
 
 st.set_page_config(
     page_title="Quantitative Equal-Weight Sector Dashboard",
@@ -1443,11 +1444,12 @@ show_data_health(master_ohlc, tickers=None, key_suffix="full_universe")
 # ==============================================================================
 # 9. TOP-LEVEL DASHBOARD NAVIGATION TABS
 # ==============================================================================
-main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
-    "🕯️ Single Sector Candlesticks & RS",
-    "📈 Multi-Sector Comparison vs Benchmark",
-    "🧠 Sector Momentum, Breadth & Rank History",
-    "🔍 Stock Attribution & Driver Deep-Dive"
+main_tab1, main_tab2, main_tab3, main_tab4, main_tab5 = st.tabs([  
+    "🕯️ Single Sector Candlesticks & RS",  
+    "📈 Multi-Sector Comparison vs Benchmark",  
+    "🧠 Sector Momentum, Breadth & Rank History",  
+    "🔍 Stock Attribution & Driver Deep-Dive",
+    "🧪 MomentumSys Sector Backtest"
 ])
 
 # ==============================================================================
@@ -2082,3 +2084,14 @@ with main_tab4:
                 "Trend Smoothness (KER)", "R-Squared", "Annualized Volatility (%)"
             ]
             st.dataframe(df_stocks[display_stk_cols], use_container_width=True, hide_index=True)
+
+# ==============================================================================
+# TAB 5: MOMENTUMSYS WEEKLY SECTORAL INDICES BACKTEST
+# ==============================================================================
+with main_tab5:
+    render_backtest_tab(
+        raw_disk_ohlc,
+        st.session_state.sectors,
+        cache_ts_key,
+        fetch_benchmark_series
+    )
