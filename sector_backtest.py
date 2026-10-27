@@ -242,11 +242,12 @@ def compute_sector_scores(weekly_data, rsi_period=14, rsi_ma_period=20):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def compute_stock_indicators(_weekly_data, cache_ts_key, rsi_period=14, rsi_ma_period=20):
+def compute_stock_indicators(_weekly_data, sectors_json, cache_ts_key, rsi_period=14, rsi_ma_period=20):
     """
-    Precomputes stock-level technical indicators and the 5 sector-independent
-    score components (out of 87.5 pts). The 6th component (12.5 pts: Stock 52w
-    return > Sector Peer Median) is added dynamically per sector.
+    Precomputes stock-level technical indicators, the 5 sector-independent
+    score components (out of 87.5 pts), and the vectorized per-sector C1,
+    total score, and 1W/2W/3W lagged score matrices so score_stocks_in_sector_at_week
+    requires zero per-ticker or per-week loops.
     Stock Weights (Rescaled 80 -> 100 via x1.25):
       - C1 (Peer Rel 52w Return): 12.5 pts
       - C2 (RSI > 60):            25.0 pts
@@ -257,8 +258,11 @@ def compute_stock_indicators(_weekly_data, cache_ts_key, rsi_period=14, rsi_ma_p
     Stock Exit Rule (ONLY stock exit):
       - RSI < RSI-MA AND RSI < 50 on Friday close.
     """
+    sectors_dict = json.loads(sectors_json)
     stk_close = _weekly_data["stk_close"]
     stk_elig = _weekly_data["stk_ipo_eligible"]
+    stk_ret_52w = _weekly_data["stk_ret_52w"]
+    peer_med_df = _weekly_data["peer_median_52w"]
 
     rsi = compute_wilder_rsi(stk_close, period=rsi_period)
     rsi_ma = rsi.rolling(rsi_ma_period, min_periods=rsi_ma_period).mean()
@@ -284,6 +288,30 @@ def compute_stock_indicators(_weekly_data, cache_ts_key, rsi_period=14, rsi_ma_p
         c2_rsi_60 + c3_rsi_above_ma + c4_gap_4w + c5_recent_high + c6_near_high
     ).where(stk_elig, np.nan)
 
+    # Precompute vectorized C1, total score, and shifted (-1W, -2W, -3W) matrices per sector
+    c1_by_sec = {}
+    score_by_sec = {}
+    score_m1w_by_sec = {}
+    score_m2w_by_sec = {}
+    score_m3w_by_sec = {}
+
+    for sec, tickers in sectors_dict.items():
+        cols = [t for t in tickers if t in stk_close.columns]
+        if not cols:
+            continue
+        med_s = peer_med_df[sec]
+        c1_df = (
+            stk_ret_52w[cols].gt(med_s, axis=0)
+            & stk_elig[cols]
+            & med_s.notna().values[:, None]
+        ).astype(float) * 12.5
+        sc_mat = base_score_875[cols] + c1_df
+        c1_by_sec[sec] = c1_df
+        score_by_sec[sec] = sc_mat
+        score_m1w_by_sec[sec] = sc_mat.shift(1)
+        score_m2w_by_sec[sec] = sc_mat.shift(2)
+        score_m3w_by_sec[sec] = sc_mat.shift(3)
+
     # Stock-level exit condition: RSI < RSI-MA AND RSI < 50 (NO 10-week low anywhere)
     stk_exit_signal = (rsi < rsi_ma) & (rsi < 50.0)
 
@@ -298,6 +326,11 @@ def compute_stock_indicators(_weekly_data, cache_ts_key, rsi_period=14, rsi_ma_p
         "c5_recent_high": c5_recent_high,
         "c6_near_high": c6_near_high,
         "base_score_875": base_score_875,
+        "c1_by_sec": c1_by_sec,
+        "score_by_sec": score_by_sec,
+        "score_m1w_by_sec": score_m1w_by_sec,
+        "score_m2w_by_sec": score_m2w_by_sec,
+        "score_m3w_by_sec": score_m3w_by_sec,
         "stk_exit_signal": stk_exit_signal
     }
 
@@ -312,6 +345,7 @@ def score_stocks_in_sector_at_week(
     """
     Computes the exact 100-point Stock Score & 6-component breakdown for all
     constituents of `sec_name` as of Friday close `dt_sig`.
+    Uses precomputed vectorized score and lag matrices (zero per-ticker loops).
     """
     tickers = [t for t in sectors_dict.get(sec_name, []) if t in weekly_data["stk_close"].columns]
     if not tickers:
@@ -326,7 +360,19 @@ def score_stocks_in_sector_at_week(
     high52_s = stk_ind["high_52w"].loc[dt_sig, tickers]
 
     peer_med = weekly_data["peer_median_52w"].loc[dt_sig, sec_name]
-    c1_pts = ((ret_52w_s > peer_med) & elig_s & pd.notna(peer_med)).astype(float) * 12.5
+
+    if sec_name in stk_ind.get("score_by_sec", {}):
+        c1_pts = stk_ind["c1_by_sec"][sec_name].loc[dt_sig, tickers]
+        tot_score = stk_ind["score_by_sec"][sec_name].loc[dt_sig, tickers]
+        sc_m1w = stk_ind["score_m1w_by_sec"][sec_name].loc[dt_sig, tickers]
+        sc_m2w = stk_ind["score_m2w_by_sec"][sec_name].loc[dt_sig, tickers]
+        sc_m3w = stk_ind["score_m3w_by_sec"][sec_name].loc[dt_sig, tickers]
+    else:
+        c1_pts = ((ret_52w_s > peer_med) & elig_s & pd.notna(peer_med)).astype(float) * 12.5
+        tot_score = (stk_ind["base_score_875"].loc[dt_sig, tickers] + c1_pts).where(elig_s, np.nan)
+        sc_m1w = pd.Series(np.nan, index=tickers)
+        sc_m2w = pd.Series(np.nan, index=tickers)
+        sc_m3w = pd.Series(np.nan, index=tickers)
 
     c2_pts = stk_ind["c2_rsi_60"].loc[dt_sig, tickers]
     c3_pts = stk_ind["c3_rsi_above_ma"].loc[dt_sig, tickers]
@@ -334,7 +380,6 @@ def score_stocks_in_sector_at_week(
     c5_pts = stk_ind["c5_recent_high"].loc[dt_sig, tickers]
     c6_pts = stk_ind["c6_near_high"].loc[dt_sig, tickers]
 
-    tot_score = (c1_pts + c2_pts + c3_pts + c4_pts + c5_pts + c6_pts).where(elig_s, np.nan)
     rsi_s = stk_ind["rsi"].loc[dt_sig, tickers]
     rsi_ma_s = stk_ind["rsi_ma"].loc[dt_sig, tickers]
     exit_sig_s = stk_ind["stk_exit_signal"].loc[dt_sig, tickers]
@@ -347,6 +392,9 @@ def score_stocks_in_sector_at_week(
         "Bad_Days_22D": bad_days_s.values.astype(int),
         "Entry_Filter_OK": entry_ok_s.values,
         "Stock_Score": tot_score.values,
+        "Score_-1W": sc_m1w.values,
+        "Score_-2W": sc_m2w.values,
+        "Score_-3W": sc_m3w.values,
         "C1_Rel_52W (12.5)": c1_pts.values,
         "C2_RSI>60 (25)": c2_pts.values,
         "C3_RSI>MA (12.5)": c3_pts.values,
@@ -545,11 +593,13 @@ def run_portfolio_backtest(
 # ------------------------------------------------------------------------------
 # 4. STOCK-LEVEL PORTFOLIO & TIME MACHINE ENGINE (4x3 = 12 SLOTS, 6M REBALANCE)
 # ------------------------------------------------------------------------------
+@st.cache_data(ttl=3600, show_spinner=False)
 def run_stock_portfolio_and_timemachine(
-    weekly_data,
-    sec_score_bundle,
-    stk_ind,
-    sectors_dict,
+    _weekly_data,
+    _sec_score_bundle,
+    _stk_ind,
+    sectors_json,
+    cache_ts_key,
     regime_series=None,
     sec_entry_th=75.0,
     sec_exit_th=50.0,
@@ -577,6 +627,11 @@ def run_stock_portfolio_and_timemachine(
     - Every 26 weeks (6 months), total portfolio capital is re-equalized across
       all 12 slots at Monday Open (charging one-way cost only on the net delta).
     """
+    sectors_dict = json.loads(sectors_json) if isinstance(sectors_json, str) else sectors_json
+    weekly_data = _weekly_data
+    sec_score_bundle = _sec_score_bundle
+    stk_ind = _stk_ind
+
     sec_scores = sec_score_bundle["score"]
     sec_ranks = sec_score_bundle["rank"]
     sec_ret26 = sec_score_bundle["ret_26w"]
@@ -1112,13 +1167,15 @@ def render_backtest_tab(raw_disk_ohlc, sectors_dict, cache_ts_key, fetch_benchma
         "Exit ONLY on Parent Sector Exit or Stock (RSI < RSI-MA & RSI < 50)"
     )
 
+    sectors_json = json.dumps(sectors_dict, sort_keys=True)
+
     with st.spinner("Computing weekly IPO-gated sector & stock matrices (strict completed Friday cutoff)..."):
         weekly_data = build_weekly_master_data(
             raw_disk_ohlc,
-            json.dumps(sectors_dict, sort_keys=True),
+            sectors_json,
             cache_ts_key
         )
-        stk_ind = compute_stock_indicators(weekly_data, cache_ts_key, rsi_period=14, rsi_ma_period=20)
+        stk_ind = compute_stock_indicators(weekly_data, sectors_json, cache_ts_key, rsi_period=14, rsi_ma_period=20)
         sec_score_bundle = compute_sector_scores(weekly_data, rsi_period=14, rsi_ma_period=20)
 
         nifty_daily, _ = fetch_benchmark_fn(period="15y")
@@ -1178,7 +1235,7 @@ def render_backtest_tab(raw_disk_ohlc, sectors_dict, cache_ts_key, fetch_benchma
 
     with st.spinner("Running 12-Slot Stock Engine & building week-by-week Time Machine snapshots..."):
         stk_run = run_stock_portfolio_and_timemachine(
-            weekly_data, sec_score_bundle, stk_ind, sectors_dict,
+            weekly_data, sec_score_bundle, stk_ind, sectors_json, cache_ts_key,
             regime_series=active_reg_series,
             sec_entry_th=75.0, sec_exit_th=50.0, stk_entry_th=float(stk_entry_th),
             num_sectors=4, stocks_per_sector=3, rebalance_weeks=rebal_w,
@@ -1190,11 +1247,12 @@ def render_backtest_tab(raw_disk_ohlc, sectors_dict, cache_ts_key, fetch_benchma
         return
 
     # Build Order: 1. Time Machine & Live Mode FIRST, 2. Stock & Sector Backtest Tearsheet SECOND
-    tm_tab, bt_tab, ledger_tab, score_tab = st.tabs([
+    tm_tab, bt_tab, ledger_tab, score_tab, drill_tab = st.tabs([
         "🕰️ 1. Time Machine & Live Mode (Week-by-Week Portfolio Audit)",
         "📈 2. Stock vs Sector Backtest Tearsheet & Trade Log",
         "🗂️ 3. Every-Week Historical Portfolio Holdings Ledger",
-        "🔢 4. Current Week 100-Point Sector Scoreboard"
+        "🔢 4. Current Week 100-Point Sector Scoreboard",
+        "🔍 5. Sector & Stock Drill-Scoreboard"
     ])
 
     # ==========================================================================
@@ -1324,14 +1382,14 @@ def render_backtest_tab(raw_disk_ohlc, sectors_dict, cache_ts_key, fetch_benchma
     with bt_tab:
         with st.spinner("Running comparison variants (EW Filter, ^NSEI Filter, Unfiltered & 4-Slot Sector Index)..."):
             stk_n50 = run_stock_portfolio_and_timemachine(
-                weekly_data, sec_score_bundle, stk_ind, sectors_dict,
+                weekly_data, sec_score_bundle, stk_ind, sectors_json, cache_ts_key,
                 regime_series=nifty_weekly,
                 sec_entry_th=75.0, sec_exit_th=50.0, stk_entry_th=float(stk_entry_th),
                 num_sectors=4, stocks_per_sector=3, rebalance_weeks=rebal_w,
                 start_date=start_dt, end_date=end_dt
             )
             stk_unfilt = run_stock_portfolio_and_timemachine(
-                weekly_data, sec_score_bundle, stk_ind, sectors_dict,
+                weekly_data, sec_score_bundle, stk_ind, sectors_json, cache_ts_key,
                 regime_series=None,
                 sec_entry_th=75.0, sec_exit_th=50.0, stk_entry_th=float(stk_entry_th),
                 num_sectors=4, stocks_per_sector=3, rebalance_weeks=rebal_w,
@@ -1454,5 +1512,95 @@ def render_backtest_tab(raw_disk_ohlc, sectors_dict, cache_ts_key, fetch_benchma
             }).sort_values(["Score (100)", "26W Return (%)"], ascending=[False, False])
             st.caption(f"Latest Signal Week Ending: **{str(last_w.date())}**")
             st.dataframe(cur_board, use_container_width=True, hide_index=True)
+        else:
+            st.info("No valid sector scores available.")
+
+    # ==========================================================================
+    # SUB-TAB 5: SECTOR & STOCK DRILL-SCOREBOARD
+    # ==========================================================================
+    with drill_tab:
+        st.markdown("### 🔍 Sector & Stock Drill-Scoreboard")
+        valid_score_weeks = sec_score_bundle["score"].dropna(how="all").index
+        if len(valid_score_weeks) > 0:
+            last_w = valid_score_weeks[-1]
+            st.caption(f"Latest Signal Week Ending: **{str(last_w.date())}**")
+
+            summary_rows = []
+            sec_drill_dfs = {}
+
+            for sec_name in sec_score_bundle["score"].columns:
+                sec_df = score_stocks_in_sector_at_week(sec_name, last_w, sectors_dict, weekly_data, stk_ind)
+                if not sec_df.empty:
+                    sec_df_sorted = sec_df.sort_values(
+                        by=["Stock_Score", "_ret26_raw"],
+                        ascending=[False, False]
+                    ).reset_index(drop=True)
+                    n75 = int((sec_df_sorted["Stock_Score"] >= 75.0).sum())
+                    n100 = int((sec_df_sorted["Stock_Score"] >= 99.9).sum())
+                else:
+                    sec_df_sorted = sec_df
+                    n75, n100 = 0, 0
+
+                sec_drill_dfs[sec_name] = sec_df_sorted
+                summary_rows.append({
+                    "Sector": sec_name,
+                    "Sector Rank": sec_score_bundle["rank"].loc[last_w, sec_name],
+                    "Sector Score": sec_score_bundle["score"].loc[last_w, sec_name],
+                    "Stocks ≥ 75": n75,
+                    "Stocks = 100": n100,
+                    "_ret26": sec_score_bundle["ret_26w"].loc[last_w, sec_name]
+                })
+
+            sum_df = pd.DataFrame(summary_rows)
+            sum_df_by_score = sum_df.sort_values(
+                by=["Sector Score", "_ret26"],
+                ascending=[False, False]
+            ).reset_index(drop=True)
+
+            st.dataframe(
+                sum_df_by_score[["Sector", "Sector Rank", "Sector Score", "Stocks ≥ 75", "Stocks = 100"]],
+                use_container_width=True,
+                hide_index=True
+            )
+
+            only_100 = st.toggle("Show only stocks scoring 100", value=False)
+
+            sum_df_by_rank = sum_df.sort_values(
+                by=["Sector Rank", "Sector Score", "_ret26"],
+                ascending=[True, False, False]
+            ).reset_index(drop=True)
+
+            for _, srow in sum_df_by_rank.iterrows():
+                sec_name = srow["Sector"]
+                n75 = int(srow["Stocks ≥ 75"])
+                n100 = int(srow["Stocks = 100"])
+                exp_label = f"📂 {sec_name} | ≥75: {n75} | =100: {n100}"
+
+                with st.expander(exp_label, expanded=False):
+                    sdf = sec_drill_dfs.get(sec_name, pd.DataFrame())
+                    if not sdf.empty:
+                        if only_100:
+                            filt_df = sdf[sdf["Stock_Score"] >= 99.9].copy()
+                        else:
+                            filt_df = sdf[sdf["Stock_Score"] >= 75.0].copy()
+                    else:
+                        filt_df = pd.DataFrame()
+
+                    if not filt_df.empty:
+                        filt_df = filt_df.rename(columns={
+                            "Pct_From_52W_High (%)": "Proximity to 52W High (%)",
+                            "26W_Ret (%)": "26W Return (%)"
+                        })
+                        drill_cols = [
+                            "Ticker", "Stock_Score", "Score_-1W", "Score_-2W", "Score_-3W",
+                            "Proximity to 52W High (%)", "26W Return (%)",
+                            "RSI(14)", "Close", "Entry_Filter_OK", "Bad_Days_22D"
+                        ]
+                        st.dataframe(filt_df[drill_cols], use_container_width=True, hide_index=True)
+                    else:
+                        if only_100:
+                            st.caption("No stocks in this sector scored 100 this week.")
+                        else:
+                            st.caption("No stocks in this sector scored ≥ 75 this week.")
         else:
             st.info("No valid sector scores available.")
